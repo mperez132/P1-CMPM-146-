@@ -1,6 +1,5 @@
 import queue
 from typing import NewType
-import Dijkstra_forward_search
 from heapq import heappop, heappush, heappushpop
 
 from heapq import heappop, heappush
@@ -37,7 +36,7 @@ def find_path (source_point, destination_point, mesh):
 
         return path, sameBox
 
-    fBoxes, bBoxes, visited = astar(source, dest, mesh, heuristic)
+    fBoxes, bBoxes, visited = bi_astar(source, dest, mesh, heuristic)
 
     if not fBoxes and not bBoxes and not visited:
         return [], mesh['boxes']
@@ -73,6 +72,7 @@ def find_path (source_point, destination_point, mesh):
     bBoxes.reverse()
 
     path = combinePath(fBoxes, bBoxes)
+    
 
     path = find_detail_point(path, source_point)
     if (len(path) >= 1):
@@ -143,7 +143,7 @@ def all_detail_points(point1, point2):
 #g(n) = cost from beginning to curr (curr + all parents)
 #h(n) = heuristic: estimate from curr to dest 
 #current is the highest priority (lowest number) in the queue
-def astar(source, dest, mesh, adj):
+def bi_astar(source, dest, mesh, adj):
     #myQueue = queue.PriorityQueue() #open set
     #myQueue.put(source, 0)
     newQueue = []
@@ -298,3 +298,87 @@ def find_box(point, mesh):
             return box
     return False
 
+def astar(source, dest, mesh, adj):
+    #myQueue = queue.PriorityQueue() #open set
+    myQueue = []
+    #myQueue.put(source, 0)
+    heappush(myQueue, (0, source))
+    parent = dict() #came from
+    total_cost = dict() #f(g) cost_so_far (gCost)
+    parent[source] = None
+    total_cost[source] = 0
+
+    while myQueue:
+        prio, curr, = heappop(myQueue)
+        #myQueue.pop()
+        # boxes.append(curr)
+        if (curr == dest): #path found
+            #print("BOX TEST 4", parent)
+            boxes = parentPath(parent, source, dest)
+            #print("BOX TEST 2", boxes)
+            return boxes, parent.keys()
+
+        for neighbor in mesh['adj'][curr]: #goes through each neighbor of current
+            # if neighbor in boxes: #if neighbor has already been visited/evaluated
+            #     continue
+            #print("BOX TEST 5", parent)
+            new_cost = total_cost[curr] + EuclidianDistance(center(curr), center(neighbor))
+            if neighbor not in total_cost or new_cost < total_cost[neighbor]:
+                total_cost[neighbor] = new_cost
+                prio = new_cost + heuristic(dest, neighbor)
+                #myQueue.put(neighbor, priority)
+                heappush(myQueue, (prio, neighbor))
+                parent[neighbor] = curr
+                #print("ANOTHER TEST", curr)
+
+    print("Path not found!")
+    return ([], [])
+
+def parentPath(parent, source, dest):
+    #start from destination
+    #find dest parent
+    #loop and find every parent before
+    path = []
+    temp = dest
+    while temp != source:
+        path.insert(0, parent[temp])
+        temp = parent[temp]
+
+    return path
+
+def BFS(mesh, source_point, destination_point):
+    queue = []
+    boxes = []
+    path = []
+    tempBool = False
+    #print our source and our goal coordinates
+    print(source_point)
+    print(destination_point)
+    #find the box
+    source_box = find_box(source_point, mesh)
+    destination_box = find_box(destination_point, mesh)
+
+    #if there is no path then we must display
+    if(not source_box or not destination_box):
+        print("No path found!")
+        return (path,boxes)
+
+    queue.append(source_box)
+    boxes.append(source_box)
+    while queue:
+        curr_box = heappop(queue)
+        if curr_box == destination_box:
+            tempBool = True
+            break
+        for adj_box in mesh['adj'][curr_box]:
+            if adj_box not in boxes:
+                queue.append(adj_box)
+                boxes.append(adj_box)
+
+
+    if tempBool is True:
+        print("There is a path with BFS!")
+    else:
+        print("No path found with BFS!")
+
+    return path, boxes
