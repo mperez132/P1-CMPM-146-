@@ -182,6 +182,17 @@ def combinePath(fPath, bPath):
     
     return path
         
+def parentPath(parent, source, dest):
+    #start from destination
+    #find dest parent
+    #loop and find every parent before
+    path = []
+    temp = dest
+    while temp != source:
+        path.insert(0, parent[temp])
+        temp = parent[temp]
+
+    return path
 
 def fParentPath(parent, source, dest):
     #start from destination
@@ -234,3 +245,38 @@ def find_box(point, mesh):
             return box
     return False
 
+def astar(source, dest, mesh, adj):
+    #myQueue = queue.PriorityQueue() #open set
+    myQueue = []
+    #myQueue.put(source, 0)
+    heappush(myQueue, (0, source))
+    parent = dict() #came from
+    total_cost = dict() #f(g) cost_so_far (gCost)
+    parent[source] = None
+    total_cost[source] = 0
+
+    while myQueue:
+        prio, curr, = heappop(myQueue)
+        #myQueue.pop()
+        # boxes.append(curr)
+        if (curr == dest): #path found
+            #print("BOX TEST 4", parent)
+            boxes = parentPath(parent, source, dest)
+            #print("BOX TEST 2", boxes)
+            return boxes, parent.keys()
+
+        for neighbor in mesh['adj'][curr]: #goes through each neighbor of current
+            # if neighbor in boxes: #if neighbor has already been visited/evaluated
+            #     continue
+            #print("BOX TEST 5", parent)
+            new_cost = total_cost[curr] + EuclidianDistance(center(curr), center(neighbor))
+            if neighbor not in total_cost or new_cost < total_cost[neighbor]:
+                total_cost[neighbor] = new_cost
+                prio = new_cost + heuristic(dest, neighbor)
+                #myQueue.put(neighbor, priority)
+                heappush(myQueue, (prio, neighbor))
+                parent[neighbor] = curr
+                #print("ANOTHER TEST", curr)
+
+    print("Path not found!")
+    return ([], [])

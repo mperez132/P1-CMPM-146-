@@ -1,6 +1,6 @@
 import queue
 from typing import NewType
-#import Dijkstra_forward_search
+import Dijkstra_forward_search
 from heapq import heappop, heappush, heappushpop
 
 from heapq import heappop, heappush
@@ -21,25 +21,34 @@ def find_path (source_point, destination_point, mesh):
         A list of boxes explored by the algorithm
     """
     path = []
-    boxes = []
+    fPath = []
+    bPath = []
 
     source = find_box(source_point, mesh)
     dest = find_box(destination_point, mesh)
 
     if not source or not dest:
-        print("No Path Found!")
-        return (path, boxes)
+        print("No Path Found (OUTSIDE ASTAR FUNCTION)")
+        return (path, [])
 
-    boxes, visited = bi_astar(source, dest, mesh, heuristic)
-    #boxes, visited = astar(source, dest, mesh, heuristic)
-    emptyBox = False
-    if (not boxes) and (source != dest):
+    fBoxes, bBoxes, visited = astar(source, dest, mesh, heuristic)
+
+    emptyBox = False #update this
+    if (not fBoxes or not bBoxes) and (source != dest):
         emptyBox = True
 
-    boxes.append(dest)
+    #boxes.append(dest)
     #print("\nBOXES:", boxes)
 
-    path = find_corners(boxes, source_point, destination_point)
+    fPath = find_corners(fBoxes, source_point)
+    bPath = find_corners(bBoxes, destination_point)
+    # print("FPATH!!!", fPath)
+    # fPath.append((0, 0))
+    # print("\nFPATH AGAIN!!!", fPath)
+    # bPath.insert(0, (0, 200))
+    # print("\nBPATH!", bPath)
+
+    path = combinePath(fPath, bPath)
 
     if not emptyBox:
         path.insert(0, source_point)
@@ -54,7 +63,7 @@ def find_path (source_point, destination_point, mesh):
 #g(n) = cost from beginning to curr (curr + all parents)
 #h(n) = heuristic: estimate from curr to dest 
 #current is the highest priority (lowest number) in the queue
-def bi_astar(source, dest, mesh, adj):
+def astar(source, dest, mesh, adj):
     #myQueue = queue.PriorityQueue() #open set
     #myQueue.put(source, 0)
     newQueue = []
@@ -72,6 +81,7 @@ def bi_astar(source, dest, mesh, adj):
 
     tempSource = source
     tempDest = dest
+    tempBool = False
     
 
     while newQueue and secondQueue:
@@ -82,15 +92,16 @@ def bi_astar(source, dest, mesh, adj):
         tempSource = bCurr
         tempDest = fCurr
 
-        if fCurr == bCurr:
+        if fCurr == bCurr or tempBool:
+            print("Source Point: ", source)
             print("fCurr:", fCurr)
+            print("Destination Point: ", dest)
             print("bCurr:", bCurr)
             fBoxes = fParentPath(fParent, source, bCurr)
             bBoxes = bParentPath(bParent, dest, fCurr)
-            boxes = combinePath(fBoxes, bBoxes)
-            print("Combined Boxes:", boxes)
+            fParent.update(bParent) #combine both parent dicts
 
-            return boxes, fParent.keys()
+            return fBoxes, bBoxes, fParent.keys()
 
         for neighbor in mesh['adj'][fCurr]:
             new_cost = fTotal_cost[fCurr] + EuclidianDistance(center(fCurr), center(neighbor))
@@ -100,6 +111,11 @@ def bi_astar(source, dest, mesh, adj):
                 #myQueue.put(neighbor, priority)
                 heappush(newQueue, (fPriority, neighbor))
                 fParent[neighbor] = fCurr
+            
+            if neighbor == tempSource:
+                #fParent[neighbor] = tempSource
+                tempBool = True
+                break
 
         for neighbor in mesh['adj'][bCurr]:
             new_cost = bTotal_cost[bCurr] + EuclidianDistance(center(bCurr), center(neighbor))
@@ -109,9 +125,53 @@ def bi_astar(source, dest, mesh, adj):
                 heappush(secondQueue, (bPriority, neighbor))
                 bParent[neighbor] = bCurr
 
+            if neighbor == tempDest:
+                #bParent[neighbor] = tempDest
+                tempBool = True
+                break
 
-    print("Path Not Found!")
-    return ([], [])
+
+    print("Path Not Found (INSIDE ASTAR FUNCTION)")
+    return ([], [], [])
+
+
+def find_corners(boxes, source_point):
+    if (len(boxes) >= 1):
+        del boxes[0]
+        del boxes[len(boxes) - 1]
+
+    newPath = []
+    #look at next box
+    #get coordinates for all 4 corners
+    #select the closest corner for path
+    curr = source_point
+    for box in boxes:
+        topLeft = (box[0], box[2])
+        topRight = (box[1], box[3])
+        bottomLeft = (box[1], box[2])
+        bottomRight = (box[1], box[3])
+
+        TLcost = EuclidianDistance(curr, topLeft)
+        TRcost = EuclidianDistance(curr, topRight)
+        BLcost = EuclidianDistance(curr, bottomLeft)
+        BRcost = EuclidianDistance(curr, bottomRight)
+
+        cornersList = [TLcost, TRcost, BLcost, BRcost]
+        bestCost = min(cornersList)
+
+        if bestCost == TLcost:
+            newPath.append(topLeft)
+        if bestCost == TRcost:
+            newPath.append(topRight)
+        if bestCost == BLcost:
+            newPath.append(bottomLeft)
+        if bestCost == BRcost:
+            newPath.append(bottomRight)
+
+        curr = center(box)
+
+    return newPath
+
 
 def combinePath(fPath, bPath):
     path = []
@@ -155,44 +215,6 @@ def bParentPath(parent, source, dest):
 
     return path
 
-def find_corners(boxes, source_point, destination_point):
-    del boxes[0]
-    if (len(boxes) >= 1):
-        del boxes[len(boxes) - 1]
-
-    newPath = []
-    #look at next box
-    #get coordinates for all 4 corners
-    #select the closest corner for path
-    curr = source_point
-    for box in boxes:
-        topLeft = (box[0], box[2])
-        topRight = (box[1], box[3])
-        bottomLeft = (box[1], box[2])
-        bottomRight = (box[1], box[3])
-
-        TLcost = EuclidianDistance(curr, topLeft)
-        TRcost = EuclidianDistance(curr, topRight)
-        BLcost = EuclidianDistance(curr, bottomLeft)
-        BRcost = EuclidianDistance(curr, bottomRight)
-
-        cornersList = [TLcost, TRcost, BLcost, BRcost]
-        bestCost = min(cornersList)
-
-        if bestCost == TLcost:
-            newPath.append(topLeft)
-        if bestCost == TRcost:
-            newPath.append(topRight)
-        if bestCost == BLcost:
-            newPath.append(bottomLeft)
-        if bestCost == BRcost:
-            newPath.append(bottomRight)
-
-        curr = center(box)
-
-    return newPath
-
-
 
 def EuclidianDistance(cell1, cell2):
     return sqrt((cell1[0] - cell2[0])**2 + (cell1[1] - cell2[1])**2)
@@ -213,7 +235,7 @@ def center(box):
     return (y, x) 
 
 
-def heuristic(b, a):
+def heuristic(a, b): #a-b was swapped from b-a
    return abs(a[0] - b[2]) + abs(a[1] - b[2])
 
 
